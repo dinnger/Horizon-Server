@@ -2,15 +2,36 @@
 
 Backend de la aplicación Horizon construido con Node.js, Express, Socket.IO y Sequelize.
 
-## Estructura de la Base de Datos
+## Arquitectura del Socket.IO
 
-La aplicación utiliza una jerarquía de datos donde:
+El servidor utiliza una arquitectura modular para Socket.IO con las siguientes características:
 
-- Un **Usuario** puede tener múltiples **Workspaces**
-- Un **Workspace** puede tener múltiples **Proyectos**
-- Un **Proyecto** puede tener múltiples **Workflows**
-- Un **Workflow** puede tener múltiples **Ejecuciones**
-- Una **Ejecución** puede tener múltiples **Logs**
+### Middleware de Autenticación
+
+- **`socketAuth.ts`**: Middleware que maneja la autenticación de usuarios en Socket.IO
+- Permite conexiones sin autenticación inicialmente (para login)
+- Cada ruta individual valida la autenticación según sea necesario
+- Almacena información del usuario autenticado en el socket
+
+### Rutas Modulares
+
+Las rutas están organizadas en módulos separados:
+
+- **`auth.ts`**: Manejo de autenticación (login, verificación de permisos)
+- **`workspaces.ts`**: Gestión de workspaces con validación de propiedad
+- **`projects.ts`**: Gestión de proyectos con validación de acceso al workspace
+- **`workflows.ts`**: Gestión de workflows con validación de acceso al proyecto
+- **`settings.ts`**: Configuraciones de usuario
+- **`admin.ts`**: Administración de roles, permisos y usuarios (solo admins)
+
+### Validación de Permisos
+
+Cada ruta implementa validaciones de seguridad:
+
+- **Autenticación**: Verificación de usuario autenticado
+- **Autorización**: Validación de permisos basada en roles
+- **Propiedad**: Los usuarios solo pueden acceder a sus propios recursos
+- **Administración**: Funciones administrativas solo para SuperAdmin/Admin
 
 ### Modelos
 
@@ -134,4 +155,71 @@ server/
 ├── package.json
 ├── tsconfig.json
 └── .env.example
+```
+
+## Estructura de la Base de Datos
+
+La aplicación utiliza una jerarquía de datos donde:
+
+- Un **Usuario** puede tener múltiples **Workspaces**
+- Un **Workspace** puede tener múltiples **Proyectos**
+- Un **Proyecto** puede tener múltiples **Workflows**
+- Un **Workflow** puede tener múltiples **Ejecuciones**
+- Una **Ejecución** puede tener múltiples **Logs**
+
+## Conexión del Cliente
+
+Para conectarse al servidor Socket.IO, el cliente debe:
+
+1. **Conexión inicial** (sin autenticación):
+
+```javascript
+const socket = io("http://localhost:3001");
+```
+
+2. **Login del usuario**:
+
+```javascript
+socket.emit(
+  "auth:login",
+  {
+    email: "user@example.com",
+    password: "password",
+  },
+  (response) => {
+    if (response.success) {
+      // Reconectar con autenticación
+      socket.disconnect();
+      const authenticatedSocket = io("http://localhost:3001", {
+        auth: {
+          userId: response.user.id,
+        },
+      });
+    }
+  }
+);
+```
+
+3. **Uso de rutas autenticadas**:
+
+```javascript
+// Listar workspaces del usuario
+socket.emit("workspaces:list", {}, (response) => {
+  console.log(response.workspaces);
+});
+
+// Crear un nuevo proyecto
+socket.emit(
+  "projects:create",
+  {
+    workspaceId: "workspace-id",
+    name: "Mi Proyecto",
+    description: "Descripción del proyecto",
+  },
+  (response) => {
+    if (response.success) {
+      console.log("Proyecto creado:", response.project);
+    }
+  }
+);
 ```
