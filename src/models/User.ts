@@ -1,0 +1,109 @@
+import { DataTypes, Model, type Optional } from "sequelize";
+import { sequelize } from "../config/database";
+
+export interface UserAttributes {
+	id: string;
+	email: string;
+	name: string;
+	password: string;
+	avatar?: string;
+	role: "admin" | "user";
+	status: "active" | "inactive" | "suspended";
+	lastLoginAt?: Date;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+export interface UserCreationAttributes
+	extends Optional<
+		UserAttributes,
+		"id" | "avatar" | "lastLoginAt" | "createdAt" | "updatedAt"
+	> {}
+
+export class User
+	extends Model<UserAttributes, UserCreationAttributes>
+	implements UserAttributes
+{
+	public id!: string;
+	public email!: string;
+	public name!: string;
+	public password!: string;
+	public avatar?: string;
+	public role!: "admin" | "user";
+	public status!: "active" | "inactive" | "suspended";
+	public lastLoginAt?: Date;
+
+	// timestamps!
+	public readonly createdAt!: Date;
+	public readonly updatedAt!: Date;
+}
+
+User.init(
+	{
+		id: {
+			type: DataTypes.UUID,
+			defaultValue: DataTypes.UUIDV4,
+			primaryKey: true,
+		},
+		email: {
+			type: DataTypes.STRING,
+			allowNull: false,
+			unique: true,
+			validate: {
+				isEmail: true,
+			},
+		},
+		name: {
+			type: DataTypes.STRING,
+			allowNull: false,
+		},
+		password: {
+			type: DataTypes.STRING,
+			allowNull: false,
+		},
+		avatar: {
+			type: DataTypes.TEXT,
+			allowNull: true,
+		},
+		role: {
+			type: DataTypes.ENUM("admin", "user"),
+			allowNull: false,
+			defaultValue: "user",
+		},
+		status: {
+			type: DataTypes.ENUM("active", "inactive", "suspended"),
+			allowNull: false,
+			defaultValue: "active",
+		},
+		lastLoginAt: {
+			type: DataTypes.DATE,
+			allowNull: true,
+		},
+		createdAt: {
+			type: DataTypes.DATE,
+			allowNull: false,
+			defaultValue: DataTypes.NOW,
+		},
+		updatedAt: {
+			type: DataTypes.DATE,
+			allowNull: false,
+			defaultValue: DataTypes.NOW,
+		},
+	},
+	{
+		sequelize,
+		modelName: "User",
+		tableName: "users",
+		indexes: [
+			{
+				unique: true,
+				fields: ["email"],
+			},
+			{
+				fields: ["status"],
+			},
+		],
+	},
+);
+
+export default User;

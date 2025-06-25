@@ -1,0 +1,143 @@
+import { DataTypes, Model, type Optional } from "sequelize";
+import { sequelize } from "../config/database";
+import Workflow from "./Workflow";
+
+export interface WorkflowExecutionAttributes {
+	id: string;
+	workflowId: string;
+	status: "success" | "running" | "failed" | "pending";
+	startTime: Date;
+	endTime?: Date;
+	duration?: string;
+	trigger: string;
+	executionData?: object; // JSON para almacenar inputs, outputs, logs, etc.
+	errorMessage?: string;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+export interface WorkflowExecutionCreationAttributes
+	extends Optional<
+		WorkflowExecutionAttributes,
+		| "id"
+		| "endTime"
+		| "duration"
+		| "executionData"
+		| "errorMessage"
+		| "createdAt"
+		| "updatedAt"
+	> {}
+
+export class WorkflowExecution
+	extends Model<
+		WorkflowExecutionAttributes,
+		WorkflowExecutionCreationAttributes
+	>
+	implements WorkflowExecutionAttributes
+{
+	public id!: string;
+	public workflowId!: string;
+	public status!: "success" | "running" | "failed" | "pending";
+	public startTime!: Date;
+	public endTime?: Date;
+	public duration?: string;
+	public trigger!: string;
+	public executionData?: object;
+	public errorMessage?: string;
+
+	// timestamps!
+	public readonly createdAt!: Date;
+	public readonly updatedAt!: Date;
+}
+
+WorkflowExecution.init(
+	{
+		id: {
+			type: DataTypes.UUID,
+			defaultValue: DataTypes.UUIDV4,
+			primaryKey: true,
+		},
+		workflowId: {
+			type: DataTypes.UUID,
+			allowNull: false,
+			references: {
+				model: Workflow,
+				key: "id",
+			},
+			onUpdate: "CASCADE",
+			onDelete: "CASCADE",
+		},
+		status: {
+			type: DataTypes.ENUM("success", "running", "failed", "pending"),
+			allowNull: false,
+			defaultValue: "pending",
+		},
+		startTime: {
+			type: DataTypes.DATE,
+			allowNull: false,
+			defaultValue: DataTypes.NOW,
+		},
+		endTime: {
+			type: DataTypes.DATE,
+			allowNull: true,
+		},
+		duration: {
+			type: DataTypes.STRING,
+			allowNull: true,
+		},
+		trigger: {
+			type: DataTypes.STRING,
+			allowNull: false,
+			defaultValue: "manual",
+		},
+		executionData: {
+			type: DataTypes.JSON,
+			allowNull: true,
+		},
+		errorMessage: {
+			type: DataTypes.TEXT,
+			allowNull: true,
+		},
+		createdAt: {
+			type: DataTypes.DATE,
+			allowNull: false,
+			defaultValue: DataTypes.NOW,
+		},
+		updatedAt: {
+			type: DataTypes.DATE,
+			allowNull: false,
+			defaultValue: DataTypes.NOW,
+		},
+	},
+	{
+		sequelize,
+		modelName: "WorkflowExecution",
+		tableName: "workflow_executions",
+		indexes: [
+			{
+				fields: ["workflow_id"],
+			},
+			{
+				fields: ["status"],
+			},
+			{
+				fields: ["start_time"],
+			},
+			{
+				fields: ["workflow_id", "status"],
+			},
+		],
+	},
+);
+
+// Associations
+WorkflowExecution.belongsTo(Workflow, {
+	foreignKey: "workflowId",
+	as: "workflow",
+});
+Workflow.hasMany(WorkflowExecution, {
+	foreignKey: "workflowId",
+	as: "executions",
+});
+
+export default WorkflowExecution;
