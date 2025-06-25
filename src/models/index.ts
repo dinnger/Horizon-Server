@@ -1,5 +1,8 @@
 // Import all models
 import User from "./User";
+import Role from "./Role";
+import Permission from "./Permission";
+import RolePermission from "./RolePermission";
 import Workspace from "./Workspace";
 import Project from "./Project";
 import Workflow from "./Workflow";
@@ -9,7 +12,9 @@ import UserSettings from "./UserSettings";
 import { sequelize } from "../config/database";
 
 // Define all associations here to avoid circular dependencies
-// User associations are already defined in individual model files
+// User associations
+User.belongsTo(Role, { foreignKey: "roleId", as: "role" });
+Role.hasMany(User, { foreignKey: "roleId", as: "users" });
 
 // Initialize database
 export const initDatabase = async () => {
@@ -30,6 +35,9 @@ export const initDatabase = async () => {
 // Export all models
 export {
 	User,
+	Role,
+	Permission,
+	RolePermission,
 	Workspace,
 	Project,
 	Workflow,
@@ -44,6 +52,21 @@ export type {
 	UserAttributes,
 	UserCreationAttributes,
 } from "./User";
+
+export type {
+	RoleAttributes,
+	RoleCreationAttributes,
+} from "./Role";
+
+export type {
+	PermissionAttributes,
+	PermissionCreationAttributes,
+} from "./Permission";
+
+export type {
+	RolePermissionAttributes,
+	RolePermissionCreationAttributes,
+} from "./RolePermission";
 
 export type {
 	WorkspaceAttributes,

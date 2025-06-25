@@ -7,7 +7,7 @@ export interface UserAttributes {
 	name: string;
 	password: string;
 	avatar?: string;
-	role: "admin" | "user";
+	roleId: string; // Cambiar de role a roleId
 	status: "active" | "inactive" | "suspended";
 	lastLoginAt?: Date;
 	createdAt: Date;
@@ -29,7 +29,7 @@ export class User
 	public name!: string;
 	public password!: string;
 	public avatar?: string;
-	public role!: "admin" | "user";
+	public roleId!: string; // Cambiar de role a roleId
 	public status!: "active" | "inactive" | "suspended";
 	public lastLoginAt?: Date;
 
@@ -65,10 +65,9 @@ User.init(
 			type: DataTypes.TEXT,
 			allowNull: true,
 		},
-		role: {
-			type: DataTypes.ENUM("admin", "user"),
+		roleId: {
+			type: DataTypes.UUID,
 			allowNull: false,
-			defaultValue: "user",
 		},
 		status: {
 			type: DataTypes.ENUM("active", "inactive", "suspended"),

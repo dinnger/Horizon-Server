@@ -8,6 +8,9 @@ import bcrypt from "bcrypt";
 import {
 	initDatabase,
 	User,
+	Role,
+	Permission,
+	RolePermission,
 	Workspace,
 	Project,
 	Workflow,
@@ -51,6 +54,20 @@ io.on("connection", (socket) => {
 						model: UserSettings,
 						as: "settings",
 					},
+					{
+						model: Role,
+						as: "role",
+						include: [
+							{
+								model: Permission,
+								as: "permissions",
+								through: {
+									where: { granted: true },
+									attributes: [],
+								},
+							},
+						],
+					},
 				],
 			});
 
@@ -58,13 +75,19 @@ io.on("connection", (socket) => {
 				// Update last login
 				await user.update({ lastLoginAt: new Date() });
 
+				const userWithRole = user as User & {
+					settings?: UserSettings;
+					role?: Role & { permissions?: Permission[] };
+				};
+
 				const userResponse = {
 					id: user.id,
 					email: user.email,
 					name: user.name,
 					avatar: user.avatar,
-					role: user.role,
-					settings: (user as User & { settings?: UserSettings }).settings,
+					role: userWithRole.role,
+					permissions: userWithRole.role?.permissions || [],
+					settings: userWithRole.settings,
 				};
 
 				callback({ success: true, user: userResponse });
@@ -330,6 +353,184 @@ io.on("connection", (socket) => {
 				success: false,
 				message: "Error al actualizar configuraciones",
 			});
+		}
+	});
+
+	// Roles and Permissions Management
+	socket.on("roles:list", async (data, callback) => {
+		try {
+			const roles = await Role.findAll({
+				where: { status: "active" },
+				include: [
+					{
+						model: Permission,
+						as: "permissions",
+						through: {
+							where: { granted: true },
+							attributes: [],
+						},
+					},
+				],
+				order: [["level", "ASC"]],
+			});
+			callback({ success: true, roles });
+		} catch (error) {
+			console.error("Error listando roles:", error);
+			callback({ success: false, message: "Error al cargar roles" });
+		}
+	});
+
+	socket.on("permissions:list", async (data, callback) => {
+		try {
+			const permissions = await Permission.findAll({
+				where: { status: "active" },
+				order: [
+					["module", "ASC"],
+					["action", "ASC"],
+				],
+			});
+			callback({ success: true, permissions });
+		} catch (error) {
+			console.error("Error listando permisos:", error);
+			callback({ success: false, message: "Error al cargar permisos" });
+		}
+	});
+
+	socket.on("roles:create", async (data, callback) => {
+		try {
+			const role = await Role.create(data);
+			callback({ success: true, role });
+			socket.broadcast.emit("roles:created", role);
+		} catch (error) {
+			console.error("Error creando rol:", error);
+			callback({ success: false, message: "Error al crear rol" });
+		}
+	});
+
+	socket.on("roles:update", async (data, callback) => {
+		try {
+			const { id, ...updates } = data;
+			const [updatedRows] = await Role.update(updates, { where: { id } });
+			if (updatedRows > 0) {
+				const role = await Role.findByPk(id);
+				callback({ success: true, role });
+				socket.broadcast.emit("roles:updated", role);
+			} else {
+				callback({ success: false, message: "Rol no encontrado" });
+			}
+		} catch (error) {
+			console.error("Error actualizando rol:", error);
+			callback({ success: false, message: "Error al actualizar rol" });
+		}
+	});
+
+	socket.on("roles:assign-permissions", async (data, callback) => {
+		try {
+			const { roleId, permissionIds } = data;
+
+			// Remove existing permissions for this role
+			await RolePermission.destroy({ where: { roleId } });
+
+			// Add new permissions
+			const rolePermissions = permissionIds.map((permissionId: string) => ({
+				roleId,
+				permissionId,
+				granted: true,
+			}));
+
+			await RolePermission.bulkCreate(rolePermissions);
+
+			callback({ success: true });
+			socket.broadcast.emit("roles:permissions-updated", {
+				roleId,
+				permissionIds,
+			});
+		} catch (error) {
+			console.error("Error asignando permisos:", error);
+			callback({ success: false, message: "Error al asignar permisos" });
+		}
+	});
+
+	socket.on("users:list", async (data, callback) => {
+		try {
+			const users = await User.findAll({
+				where: { status: { [Op.ne]: "suspended" } },
+				include: [
+					{
+						model: Role,
+						as: "role",
+					},
+				],
+				attributes: { exclude: ["password"] },
+				order: [["createdAt", "DESC"]],
+			});
+			callback({ success: true, users });
+		} catch (error) {
+			console.error("Error listando usuarios:", error);
+			callback({ success: false, message: "Error al cargar usuarios" });
+		}
+	});
+
+	socket.on("users:update-role", async (data, callback) => {
+		try {
+			const { userId, roleId } = data;
+			const [updatedRows] = await User.update(
+				{ roleId },
+				{ where: { id: userId } },
+			);
+			if (updatedRows > 0) {
+				const user = await User.findByPk(userId, {
+					include: [{ model: Role, as: "role" }],
+					attributes: { exclude: ["password"] },
+				});
+				callback({ success: true, user });
+				socket.broadcast.emit("users:role-updated", user);
+			} else {
+				callback({ success: false, message: "Usuario no encontrado" });
+			}
+		} catch (error) {
+			console.error("Error actualizando rol de usuario:", error);
+			callback({ success: false, message: "Error al actualizar rol" });
+		}
+	});
+
+	// Permission check helper
+	socket.on("auth:check-permission", async (data, callback) => {
+		try {
+			const { userId, module, action } = data;
+			const user = await User.findByPk(userId, {
+				include: [
+					{
+						model: Role,
+						as: "role",
+						include: [
+							{
+								model: Permission,
+								as: "permissions",
+								where: { module, action, status: "active" },
+								through: {
+									where: { granted: true },
+									attributes: [],
+								},
+								required: false,
+							},
+						],
+					},
+				],
+			});
+
+			const userWithRole = user as User & {
+				role?: Role & { permissions?: Permission[] };
+			};
+			const hasPermission =
+				user &&
+				userWithRole.role?.permissions &&
+				userWithRole.role.permissions.length > 0;
+
+			callback({ success: true, hasPermission });
+		} catch (error) {
+			console.error("Error verificando permisos:", error);
+			callback({ success: false, hasPermission: false });
 		}
 	});
 

@@ -1,6 +1,9 @@
 import bcrypt from "bcrypt";
 import {
 	User,
+	Role,
+	Permission,
+	RolePermission,
 	Workspace,
 	Project,
 	Workflow,
@@ -13,6 +16,197 @@ export const seedDatabase = async () => {
 		// Initialize database first
 		await initDatabase();
 
+		// Create roles first
+		const superAdminRole = await Role.findOrCreate({
+			where: { name: "SuperAdmin" },
+			defaults: {
+				name: "SuperAdmin",
+				description: "Acceso total al sistema",
+				level: 0,
+				status: "active",
+			},
+		});
+
+		const adminRole = await Role.findOrCreate({
+			where: { name: "Admin" },
+			defaults: {
+				name: "Admin",
+				description: "Administrador con acceso completo a funcionalidades",
+				level: 1,
+				status: "active",
+			},
+		});
+
+		const managerRole = await Role.findOrCreate({
+			where: { name: "Manager" },
+			defaults: {
+				name: "Manager",
+				description: "Gestor de proyectos y workflows",
+				level: 2,
+				status: "active",
+			},
+		});
+
+		const userRole = await Role.findOrCreate({
+			where: { name: "User" },
+			defaults: {
+				name: "User",
+				description: "Usuario básico con acceso limitado",
+				level: 3,
+				status: "active",
+			},
+		});
+
+		const viewerRole = await Role.findOrCreate({
+			where: { name: "Viewer" },
+			defaults: {
+				name: "Viewer",
+				description: "Solo lectura",
+				level: 4,
+				status: "active",
+			},
+		});
+
+		// Create permissions
+		const modules = [
+			"users",
+			"roles",
+			"workspaces",
+			"projects",
+			"workflows",
+			"executions",
+			"settings",
+			"logs",
+			"dashboard",
+		];
+		const actions = ["create", "read", "update", "delete", "execute", "admin"];
+
+		const permissions = [];
+		for (const module of modules) {
+			for (const action of actions) {
+				const permission = await Permission.findOrCreate({
+					where: { module, action },
+					defaults: {
+						module,
+						action,
+						description: `${action.charAt(0).toUpperCase() + action.slice(1)} access to ${module}`,
+						status: "active",
+					},
+				});
+				permissions.push(permission[0]);
+			}
+		}
+
+		// Assign permissions to roles
+		// SuperAdmin: All permissions
+		for (const permission of permissions) {
+			await RolePermission.findOrCreate({
+				where: {
+					roleId: superAdminRole[0].id,
+					permissionId: permission.id,
+				},
+				defaults: {
+					roleId: superAdminRole[0].id,
+					permissionId: permission.id,
+					granted: true,
+				},
+			});
+		}
+
+		// Admin: All except user and role management
+		const adminPermissions = permissions.filter(
+			(p) =>
+				!(
+					(p.module === "users" || p.module === "roles") &&
+					["create", "delete", "admin"].includes(p.action)
+				),
+		);
+
+		for (const permission of adminPermissions) {
+			await RolePermission.findOrCreate({
+				where: {
+					roleId: adminRole[0].id,
+					permissionId: permission.id,
+				},
+				defaults: {
+					roleId: adminRole[0].id,
+					permissionId: permission.id,
+					granted: true,
+				},
+			});
+		}
+
+		// Manager: Project and workflow management
+		const managerPermissions = permissions.filter(
+			(p) =>
+				[
+					"workspaces",
+					"projects",
+					"workflows",
+					"executions",
+					"dashboard",
+				].includes(p.module) &&
+				["create", "read", "update", "execute"].includes(p.action),
+		);
+
+		for (const permission of managerPermissions) {
+			await RolePermission.findOrCreate({
+				where: {
+					roleId: managerRole[0].id,
+					permissionId: permission.id,
+				},
+				defaults: {
+					roleId: managerRole[0].id,
+					permissionId: permission.id,
+					granted: true,
+				},
+			});
+		}
+
+		// User: Basic access
+		const userPermissions = permissions.filter(
+			(p) =>
+				[
+					"workspaces",
+					"projects",
+					"workflows",
+					"executions",
+					"dashboard",
+					"settings",
+				].includes(p.module) && ["read", "execute"].includes(p.action),
+		);
+
+		for (const permission of userPermissions) {
+			await RolePermission.findOrCreate({
+				where: {
+					roleId: userRole[0].id,
+					permissionId: permission.id,
+				},
+				defaults: {
+					roleId: userRole[0].id,
+					permissionId: permission.id,
+					granted: true,
+				},
+			});
+		}
+
+		// Viewer: Only read access
+		const viewerPermissions = permissions.filter((p) => p.action === "read");
+
+		for (const permission of viewerPermissions) {
+			await RolePermission.findOrCreate({
+				where: {
+					roleId: viewerRole[0].id,
+					permissionId: permission.id,
+				},
+				defaults: {
+					roleId: viewerRole[0].id,
+					permissionId: permission.id,
+					granted: true,
+				},
+			});
+		}
+
 		// Create admin user
 		const adminPasswordHash = await bcrypt.hash("admin123", 10);
 		const adminUser = await User.findOrCreate({
@@ -23,7 +217,22 @@ export const seedDatabase = async () => {
 				password: adminPasswordHash,
 				avatar:
 					"https://ui-avatars.com/api/?name=Administrator&background=3b82f6&color=fff",
-				role: "admin",
+				roleId: superAdminRole[0].id,
+				status: "active",
+			},
+		});
+
+		// Create manager user
+		const managerPasswordHash = await bcrypt.hash("manager123", 10);
+		const managerUser = await User.findOrCreate({
+			where: { email: "manager@horizon.com" },
+			defaults: {
+				email: "manager@horizon.com",
+				name: "Project Manager",
+				password: managerPasswordHash,
+				avatar:
+					"https://ui-avatars.com/api/?name=Project+Manager&background=f59e0b&color=fff",
+				roleId: managerRole[0].id,
 				status: "active",
 			},
 		});
@@ -38,61 +247,86 @@ export const seedDatabase = async () => {
 				password: userPasswordHash,
 				avatar:
 					"https://ui-avatars.com/api/?name=John+Doe&background=8b5cf6&color=fff",
-				role: "user",
+				roleId: userRole[0].id,
 				status: "active",
 			},
 		});
 
-		// Create user settings for both users
+		// Create viewer user
+		const viewerPasswordHash = await bcrypt.hash("viewer123", 10);
+		const viewerUser = await User.findOrCreate({
+			where: { email: "viewer@horizon.com" },
+			defaults: {
+				email: "viewer@horizon.com",
+				name: "Viewer User",
+				password: viewerPasswordHash,
+				avatar:
+					"https://ui-avatars.com/api/?name=Viewer+User&background=6b7280&color=fff",
+				roleId: viewerRole[0].id,
+				status: "active",
+			},
+		});
+
+		// Create user settings for all users
+		const defaultSettings = {
+			theme: "crystal",
+			fontSize: 16,
+			canvasRefreshRate: 33,
+			language: "es",
+			notifications: {
+				general: true,
+				workflowExecution: true,
+				errors: true,
+				systemUpdates: false,
+				projectReminders: true,
+			},
+			performance: {
+				reducedAnimations: false,
+				autoSave: true,
+			},
+			privacy: {
+				telemetry: false,
+				localCache: true,
+			},
+		};
+
+		// Admin settings (with system updates enabled)
 		await UserSettings.findOrCreate({
 			where: { userId: adminUser[0].id },
 			defaults: {
 				userId: adminUser[0].id,
-				theme: "crystal",
-				fontSize: 16,
-				canvasRefreshRate: 33,
-				language: "es",
+				...defaultSettings,
 				notifications: {
-					general: true,
-					workflowExecution: true,
-					errors: true,
+					...defaultSettings.notifications,
 					systemUpdates: true,
-					projectReminders: true,
-				},
-				performance: {
-					reducedAnimations: false,
-					autoSave: true,
-				},
-				privacy: {
-					telemetry: false,
-					localCache: true,
 				},
 			},
 		});
 
+		// Manager settings
+		await UserSettings.findOrCreate({
+			where: { userId: managerUser[0].id },
+			defaults: {
+				userId: managerUser[0].id,
+				...defaultSettings,
+			},
+		});
+
+		// Regular user settings
 		await UserSettings.findOrCreate({
 			where: { userId: regularUser[0].id },
 			defaults: {
 				userId: regularUser[0].id,
-				theme: "crystal",
-				fontSize: 16,
-				canvasRefreshRate: 33,
-				language: "es",
-				notifications: {
-					general: true,
-					workflowExecution: true,
-					errors: true,
-					systemUpdates: false,
-					projectReminders: true,
-				},
-				performance: {
-					reducedAnimations: false,
-					autoSave: true,
-				},
-				privacy: {
-					telemetry: false,
-					localCache: true,
-				},
+				...defaultSettings,
+			},
+		});
+
+		// Viewer settings
+		await UserSettings.findOrCreate({
+			where: { userId: viewerUser[0].id },
+			defaults: {
+				userId: viewerUser[0].id,
+				...defaultSettings,
 			},
 		});
 
