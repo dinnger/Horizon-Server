@@ -1,44 +1,44 @@
-import { SocketData } from './index';
-import bcrypt from "bcrypt";
-import { User, Role, Permission, UserSettings } from "../models";
+import type { SocketData } from './index'
+import bcrypt from 'bcrypt'
+import { User, Role, Permission, UserSettings } from '../models'
 
 export const setupAuthRoutes = {
 	// Authentication
-	"auth:login": async ({ data, callback }: SocketData) => {
+	'auth:login': async ({ data, callback }: SocketData) => {
 		try {
-			const { email, password } = data;
+			const { email, password } = data
 			const user = await User.findOne({
-				where: { email, status: "active" },
+				where: { email, status: 'active' },
 				include: [
 					{
 						model: UserSettings,
-						as: "settings",
+						as: 'settings'
 					},
 					{
 						model: Role,
-						as: "role",
+						as: 'role',
 						include: [
 							{
 								model: Permission,
-								as: "permissions",
+								as: 'permissions',
 								through: {
 									where: { granted: true },
-									attributes: [],
-								},
-							},
-						],
-					},
-				],
-			});
+									attributes: []
+								}
+							}
+						]
+					}
+				]
+			})
 
 			if (user && (await bcrypt.compare(password, user.password))) {
 				// Update last login
-				await user.update({ lastLoginAt: new Date() });
+				await user.update({ lastLoginAt: new Date() })
 
 				const userWithRole = user as User & {
-					settings?: UserSettings;
-					role?: Role & { permissions?: Permission[] };
-				};
+					settings?: UserSettings
+					role?: Role & { permissions?: Permission[] }
+				}
 
 				const userResponse = {
 					id: user.id,
@@ -47,61 +47,58 @@ export const setupAuthRoutes = {
 					avatar: user.avatar,
 					role: userWithRole.role,
 					permissions: userWithRole.role?.permissions || [],
-					settings: userWithRole.settings,
-				};
+					settings: userWithRole.settings
+				}
 
-				callback({ success: true, user: userResponse });
+				callback({ success: true, user: userResponse })
 			} else {
-				callback({ success: false, message: "Credenciales inválidas" });
+				callback({ success: false, message: 'Credenciales inválidas' })
 			}
 		} catch (error) {
-			console.error("Error en login:", error);
-			callback({ success: false, message: "Error interno del servidor" });
+			console.error('Error en login:', error)
+			callback({ success: false, message: 'Error interno del servidor' })
 		}
 	},
 
 	// Permission check helper
-	"auth:check-permission": async ({ data, callback }: SocketData) => {
+	'auth:check-permission': async ({ data, callback }: SocketData) => {
 		try {
-			const { userId, module, action } = data;
+			const { userId, module, action } = data
 			const user = await User.findByPk(userId, {
 				include: [
 					{
 						model: Role,
-						as: "role",
+						as: 'role',
 						include: [
 							{
 								model: Permission,
-								as: "permissions",
-								where: { module, action, status: "active" },
+								as: 'permissions',
+								where: { module, action, status: 'active' },
 								through: {
 									where: { granted: true },
-									attributes: [],
+									attributes: []
 								},
-								required: false,
-							},
-						],
-					},
-				],
-			});
+								required: false
+							}
+						]
+					}
+				]
+			})
 
 			const userWithRole = user as User & {
-				role?: Role & { permissions?: Permission[] };
-			};
-			const hasPermission =
-				user &&
-				userWithRole.role?.permissions &&
-				userWithRole.role.permissions.length > 0;
+				role?: Role & { permissions?: Permission[] }
+			}
+			const hasPermission = user && userWithRole.role?.permissions && userWithRole.role.permissions.length > 0
 
-			callback({ success: true, hasPermission });
+			callback({ success: true, hasPermission })
 		} catch (error) {
-			console.error("Error verificando permisos:", error);
-			callback({ success: false, hasPermission: false });
+			console.error('Error verificando permisos:', error)
+			callback({ success: false, hasPermission: false })
 		}
 	},
 
 	// Get current user info (requires authentication)
-	"auth:me": async ({ socket, callback }: SocketData) => {
+	'auth:me': async ({ socket, callback }: SocketData) => {
 		try {
 			const userResponse = {
 				id: socket.user.id,
@@ -109,13 +106,13 @@ export const setupAuthRoutes = {
 				name: socket.user.name,
 				avatar: socket.user.avatar,
 				role: socket.user.role,
-				permissions: socket.user.role?.permissions || [],
-			};
+				permissions: socket.user.role?.permissions || []
+			}
 
-			callback({ success: true, user: userResponse });
+			callback({ success: true, user: userResponse })
 		} catch (error) {
-			console.error("Error obteniendo usuario actual:", error);
-			callback({ success: false, message: "Error interno del servidor" });
+			console.error('Error obteniendo usuario actual:', error)
+			callback({ success: false, message: 'Error interno del servidor' })
 		}
-	},
-};
+	}
+}
