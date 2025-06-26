@@ -67,34 +67,60 @@ export const seedDatabase = async () => {
 			},
 		});
 
-		// Create permissions
-		const modules = [
-			"users",
-			"roles",
-			"workspaces",
-			"projects",
-			"workflows",
-			"executions",
-			"settings",
-			"logs",
-			"dashboard",
+		// Create permissions with new structure
+		const permissionConfigs = [
+			// Usuario básico - solo sus propios recursos
+			{ module: "workspaces", action: "create", scope: "own" as const, priority: 10, description: "Crear sus propios workspaces", status: "active" as const },
+			{ module: "workspaces", action: "list", scope: "own" as const, priority: 10, description: "Ver sus propios workspaces", status: "active" as const },
+			{ module: "workspaces", action: "update", scope: "own" as const, priority: 10, description: "Modificar sus propios workspaces", status: "active" as const },
+			{ module: "workspaces", action: "delete", scope: "own" as const, priority: 10, description: "Eliminar sus propios workspaces", status: "active" as const },
+			
+			{ module: "projects", action: "create", scope: "workspace" as const, priority: 20, description: "Crear proyectos en sus workspaces", status: "active" as const },
+			{ module: "projects", action: "list", scope: "workspace" as const, priority: 20, description: "Ver proyectos en sus workspaces", status: "active" as const },
+			{ module: "projects", action: "update", scope: "workspace" as const, priority: 20, description: "Modificar proyectos en sus workspaces", status: "active" as const },
+			{ module: "projects", action: "delete", scope: "workspace" as const, priority: 20, description: "Eliminar proyectos en sus workspaces", status: "active" as const },
+			
+			{ module: "workflows", action: "create", scope: "project" as const, priority: 30, description: "Crear workflows en sus proyectos", status: "active" as const },
+			{ module: "workflows", action: "list", scope: "project" as const, priority: 30, description: "Ver workflows en sus proyectos", status: "active" as const },
+			{ module: "workflows", action: "update", scope: "project" as const, priority: 30, description: "Modificar workflows en sus proyectos", status: "active" as const },
+			{ module: "workflows", action: "delete", scope: "project" as const, priority: 30, description: "Eliminar workflows en sus proyectos", status: "active" as const },
+			{ module: "workflows", action: "execute", scope: "project" as const, priority: 30, description: "Ejecutar workflows en sus proyectos", status: "active" as const },
+			
+			{ module: "settings", action: "read", scope: "own" as const, priority: 10, description: "Ver sus propias configuraciones", status: "active" as const },
+			{ module: "settings", action: "update", scope: "own" as const, priority: 10, description: "Modificar sus propias configuraciones", status: "active" as const },
+			
+			// Permisos administrativos (scope global)
+			{ module: "users", action: "list", scope: "global" as const, priority: 100, description: "Ver todos los usuarios", status: "active" as const },
+			{ module: "users", action: "create", scope: "global" as const, priority: 100, description: "Crear usuarios", status: "active" as const },
+			{ module: "users", action: "update", scope: "global" as const, priority: 100, description: "Modificar usuarios", status: "active" as const },
+			{ module: "users", action: "delete", scope: "global" as const, priority: 100, description: "Eliminar usuarios", status: "active" as const },
+			
+			{ module: "roles", action: "list", scope: "global" as const, priority: 100, description: "Ver roles", status: "active" as const },
+			{ module: "roles", action: "create", scope: "global" as const, priority: 100, description: "Crear roles", status: "active" as const },
+			{ module: "roles", action: "update", scope: "global" as const, priority: 100, description: "Modificar roles", status: "active" as const },
+			{ module: "roles", action: "delete", scope: "global" as const, priority: 100, description: "Eliminar roles", status: "active" as const },
+			
+			{ module: "permissions", action: "list", scope: "global" as const, priority: 100, description: "Ver permisos", status: "active" as const },
+			{ module: "permissions", action: "assign", scope: "global" as const, priority: 100, description: "Asignar permisos", status: "active" as const },
+			
+			// Permisos de solo lectura para viewers
+			{ module: "workspaces", action: "list", scope: "global" as const, priority: 5, description: "Ver todos los workspaces", status: "active" as const },
+			{ module: "projects", action: "list", scope: "global" as const, priority: 5, description: "Ver todos los proyectos", status: "active" as const },
+			{ module: "workflows", action: "list", scope: "global" as const, priority: 5, description: "Ver todos los workflows", status: "active" as const },
+
 		];
-		const actions = ["create", "read", "update", "delete", "execute", "admin"];
 
 		const permissions = [];
-		for (const module of modules) {
-			for (const action of actions) {
-				const permission = await Permission.findOrCreate({
-					where: { module, action },
-					defaults: {
-						module,
-						action,
-						description: `${action.charAt(0).toUpperCase() + action.slice(1)} access to ${module}`,
-						status: "active",
-					},
-				});
-				permissions.push(permission[0]);
-			}
+		for (const config of permissionConfigs) {
+			const permission = await Permission.findOrCreate({
+				where: { 
+					module: config.module, 
+					action: config.action, 
+					scope: config.scope 
+				},
+				defaults: config,
+			});
+			permissions.push(permission[0]);
 		}
 
 		// Assign permissions to roles

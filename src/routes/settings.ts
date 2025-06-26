@@ -1,67 +1,50 @@
-import type { Server } from "socket.io";
 import { UserSettings } from "../models";
-import type { AuthenticatedSocket } from "../middleware/socketAuth";
+import type { SocketData } from "./index";
 
-export const setupSettingsRoutes = (io: Server) => {
-	io.on("connection", (socket: AuthenticatedSocket) => {
-		// Get user settings - requires authentication
-		socket.on("settings:get", async (data, callback) => {
-			try {
-				if (!socket.userId) {
-					return callback({
-						success: false,
-						message: "Authentication required",
-					});
-				}
+export const setupSettingsRoutes = {
+	// Get user settings - requires read permission
+	"settings:get": async ({ socket, data, callback }: SocketData) => {
+		try {
+			const { userId = socket.userId } = data;
 
-				const { userId = socket.userId } = data;
+			// Users can only see their own settings unless they are admin
+			const targetUserId =
+				socket.user?.role?.name === "SuperAdmin" ? userId : socket.userId;
 
-				// Users can only see their own settings unless they are admin
-				const targetUserId =
-					socket.user?.role?.name === "SuperAdmin" ? userId : socket.userId;
+			const settings = await UserSettings.findOne({
+				where: { userId: targetUserId },
+			});
+			callback({ success: true, settings });
+		} catch (error) {
+			console.error("Error obteniendo configuraciones:", error);
+			callback({
+				success: false,
+				message: "Error al cargar configuraciones",
+			});
+		}
+	},
 
-				const settings = await UserSettings.findOne({
-					where: { userId: targetUserId },
-				});
-				callback({ success: true, settings });
-			} catch (error) {
-				console.error("Error obteniendo configuraciones:", error);
-				callback({
-					success: false,
-					message: "Error al cargar configuraciones",
-				});
-			}
-		});
+	// Update user settings - requires update permission
+	"settings:update": async ({ socket, data, callback }: SocketData) => {
+		try {
+			const { userId = socket.userId, ...updates } = data;
 
-		// Update user settings - requires authentication
-		socket.on("settings:update", async (data, callback) => {
-			try {
-				if (!socket.userId) {
-					return callback({
-						success: false,
-						message: "Authentication required",
-					});
-				}
+			// Users can only update their own settings unless they are admin
+			const targetUserId =
+				socket.user?.role?.name === "SuperAdmin" ? userId : socket.userId;
 
-				const { userId = socket.userId, ...updates } = data;
+			const [settings] = await UserSettings.upsert({
+				userId: targetUserId,
+				...updates,
+			});
 
-				// Users can only update their own settings unless they are admin
-				const targetUserId =
-					socket.user?.role?.name === "SuperAdmin" ? userId : socket.userId;
-
-				const [settings] = await UserSettings.upsert({
-					userId: targetUserId,
-					...updates,
-				});
-
-				callback({ success: true, settings });
-			} catch (error) {
-				console.error("Error actualizando configuraciones:", error);
-				callback({
-					success: false,
-					message: "Error al actualizar configuraciones",
-				});
-			}
-		});
-	});
+			callback({ success: true, settings });
+		} catch (error) {
+			console.error("Error actualizando configuraciones:", error);
+			callback({
+				success: false,
+				message: "Error al actualizar configuraciones",
+			});
+		}
+	},
 };
