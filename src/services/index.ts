@@ -8,183 +8,162 @@ import {
 	UserSettings,
 	type WorkspaceAttributes,
 	type ProjectAttributes,
-	type WorkflowAttributes,
-} from "../models";
-import { Op } from "sequelize";
+	type WorkflowAttributes
+} from '../models'
+import { Op } from 'sequelize'
 
 export const WorkspaceService = {
 	async getUserWorkspaces(userId: string) {
 		return await Workspace.findAll({
 			where: {
 				userId,
-				status: { [Op.ne]: "archived" },
+				status: { [Op.ne]: 'archived' }
 			},
 			include: [
 				{
 					model: Project,
-					as: "projects",
-					where: { status: { [Op.ne]: "archived" } },
+					as: 'projects',
+					where: { status: { [Op.ne]: 'archived' } },
 					required: false,
 					include: [
 						{
 							model: Workflow,
-							as: "workflows",
-							where: { status: { [Op.ne]: "archived" } },
-							required: false,
-						},
-					],
-				},
+							as: 'workflows',
+							where: { status: { [Op.ne]: 'archived' } },
+							required: false
+						}
+					]
+				}
 			],
 			order: [
-				["isDefault", "DESC"],
-				["createdAt", "ASC"],
-				[{ model: Project, as: "projects" }, "createdAt", "DESC"],
-				[
-					{ model: Project, as: "projects" },
-					{ model: Workflow, as: "workflows" },
-					"createdAt",
-					"DESC",
-				],
-			],
-		});
+				['isDefault', 'DESC'],
+				['createdAt', 'ASC'],
+				[{ model: Project, as: 'projects' }, 'createdAt', 'DESC'],
+				[{ model: Project, as: 'projects' }, { model: Workflow, as: 'workflows' }, 'createdAt', 'DESC']
+			]
+		})
 	},
 
-	async createWorkspace(
-		data: Omit<WorkspaceAttributes, "id" | "createdAt" | "updatedAt">,
-	) {
+	async createWorkspace(data: Omit<WorkspaceAttributes, 'id' | 'createdAt' | 'updatedAt'>) {
 		// If this is the first workspace for the user, make it default
 		const existingWorkspaces = await Workspace.count({
-			where: { userId: data.userId, status: "active" },
-		});
+			where: { userId: data.userId, status: 'active' }
+		})
 
 		return await Workspace.create({
 			...data,
-			isDefault: existingWorkspaces === 0 ? true : data.isDefault,
-		});
+			isDefault: existingWorkspaces === 0 ? true : data.isDefault
+		})
 	},
 
 	async getWorkspaceStats(workspaceId: string) {
 		const projects = await Project.findAll({
-			where: { workspaceId, status: { [Op.ne]: "archived" } },
+			where: { workspaceId, status: { [Op.ne]: 'archived' } },
 			include: [
 				{
 					model: Workflow,
-					as: "workflows",
-					where: { status: { [Op.ne]: "archived" } },
-					required: false,
-				},
-			],
-		});
+					as: 'workflows',
+					where: { status: { [Op.ne]: 'archived' } },
+					required: false
+				}
+			]
+		})
 
 		const stats = {
 			totalProjects: projects.length,
-			activeProjects: projects.filter((p) => p.status === "active").length,
-			totalWorkflows: projects.reduce(
-				(acc, p) =>
-					acc +
-					((p as Project & { workflows: Workflow[] }).workflows?.length || 0),
-				0,
-			),
+			activeProjects: projects.filter((p) => p.status === 'active').length,
+			totalWorkflows: projects.reduce((acc, p) => acc + ((p as Project & { workflows: Workflow[] }).workflows?.length || 0), 0),
 			runningWorkflows: 0,
 			successfulWorkflows: 0,
-			failedWorkflows: 0,
-		};
+			failedWorkflows: 0
+		}
 
 		for (const project of projects) {
 			const projectWithWorkflows = project as Project & {
-				workflows: Workflow[];
-			};
+				workflows: Workflow[]
+			}
 			if (projectWithWorkflows.workflows) {
 				for (const workflow of projectWithWorkflows.workflows) {
 					switch (workflow.status) {
-						case "running":
-							stats.runningWorkflows++;
-							break;
-						case "success":
-							stats.successfulWorkflows++;
-							break;
-						case "failed":
-							stats.failedWorkflows++;
-							break;
+						case 'running':
+							stats.runningWorkflows++
+							break
+						case 'success':
+							stats.successfulWorkflows++
+							break
+						case 'failed':
+							stats.failedWorkflows++
+							break
 					}
 				}
 			}
 		}
 
-		return stats;
-	},
-};
+		return stats
+	}
+}
 
 export const ProjectService = {
 	async getProjectsWithWorkflows(workspaceId: string) {
 		return await Project.findAll({
 			where: {
 				workspaceId,
-				status: { [Op.ne]: "archived" },
+				status: { [Op.ne]: 'archived' }
 			},
 			include: [
 				{
 					model: Workflow,
-					as: "workflows",
-					where: { status: { [Op.ne]: "archived" } },
-					required: false,
-				},
+					as: 'workflows',
+					where: { status: { [Op.ne]: 'archived' } },
+					required: false
+				}
 			],
 			order: [
-				["createdAt", "DESC"],
-				[{ model: Workflow, as: "workflows" }, "createdAt", "DESC"],
-			],
-		});
+				['createdAt', 'DESC'],
+				[{ model: Workflow, as: 'workflows' }, 'createdAt', 'DESC']
+			]
+		})
 	},
 
-	async createProject(
-		data: Omit<ProjectAttributes, "id" | "createdAt" | "updatedAt">,
-	) {
-		return await Project.create(data);
+	async createProject(data: Omit<ProjectAttributes, 'id' | 'createdAt' | 'updatedAt'>) {
+		return await Project.create(data)
 	},
 
 	async getProjectStats(projectId: string) {
 		const workflows = await Workflow.findAll({
-			where: { projectId, status: { [Op.ne]: "archived" } },
+			where: { projectId, status: { [Op.ne]: 'archived' } },
 			include: [
 				{
 					model: WorkflowExecution,
-					as: "executions",
-					order: [["createdAt", "DESC"]],
-					limit: 10,
-				},
-			],
-		});
+					as: 'executions',
+					order: [['createdAt', 'DESC']],
+					limit: 10
+				}
+			]
+		})
 
 		const totalExecutions = await WorkflowExecution.count({
 			include: [
 				{
 					model: Workflow,
-					as: "workflow",
-					where: { projectId },
-				},
-			],
-		});
+					as: 'workflow',
+					where: { projectId }
+				}
+			]
+		})
 
 		const stats = {
 			totalWorkflows: workflows.length,
-			runningWorkflows: workflows.filter((w) => w.status === "running").length,
-			successfulWorkflows: workflows.filter((w) => w.status === "success")
-				.length,
-			failedWorkflows: workflows.filter((w) => w.status === "failed").length,
+			runningWorkflows: workflows.filter((w) => w.status === 'running').length,
+			successfulWorkflows: workflows.filter((w) => w.status === 'success').length,
+			failedWorkflows: workflows.filter((w) => w.status === 'failed').length,
 			totalExecutions,
-			recentExecutions: workflows
-				.flatMap(
-					(w) =>
-						(w as Workflow & { executions: WorkflowExecution[] }).executions ||
-						[],
-				)
-				.slice(0, 10),
-		};
+			recentExecutions: workflows.flatMap((w) => (w as Workflow & { executions: WorkflowExecution[] }).executions || []).slice(0, 10)
+		}
 
-		return stats;
-	},
-};
+		return stats
+	}
+}
 
 export const WorkflowService = {
 	async getWorkflowWithExecutions(workflowId: string) {
@@ -192,144 +171,128 @@ export const WorkflowService = {
 			include: [
 				{
 					model: WorkflowExecution,
-					as: "executions",
+					as: 'executions',
 					include: [
 						{
 							model: ExecutionLog,
-							as: "logs",
-							order: [["timestamp", "ASC"]],
-						},
+							as: 'logs',
+							order: [['timestamp', 'ASC']]
+						}
 					],
-					order: [["createdAt", "DESC"]],
-					limit: 50,
-				},
-			],
-		});
+					order: [['createdAt', 'DESC']],
+					limit: 50
+				}
+			]
+		})
 	},
 
-	async createWorkflow(
-		data: Omit<WorkflowAttributes, "id" | "createdAt" | "updatedAt">,
-	) {
-		return await Workflow.create(data);
+	async createWorkflow(data: Omit<WorkflowAttributes, 'id' | 'createdAt' | 'updatedAt'>) {
+		return await Workflow.create(data)
 	},
 
-	async executeWorkflow(workflowId: string, trigger = "manual") {
-		const workflow = await Workflow.findByPk(workflowId);
+	async executeWorkflow(workflowId: string, trigger = 'manual') {
+		const workflow = await Workflow.findByPk(workflowId)
 		if (!workflow) {
-			throw new Error("Workflow not found");
+			throw new Error('Workflow not found')
 		}
 
 		// Create execution record
 		const execution = await WorkflowExecution.create({
 			workflowId,
-			status: "running",
+			status: 'running',
 			startTime: new Date(),
-			trigger,
-		});
+			trigger
+		})
 
 		// Update workflow status
 		await workflow.update({
-			status: "running",
-			lastRun: new Date(),
-		});
+			status: 'running',
+			lastRun: new Date()
+		})
 
 		// Log start
 		await ExecutionLog.create({
 			executionId: execution.id,
-			level: "info",
+			level: 'info',
 			message: `Workflow execution started (trigger: ${trigger})`,
-			timestamp: new Date(),
-		});
+			timestamp: new Date()
+		})
 
-		return execution;
+		return execution
 	},
 
-	async completeExecution(
-		executionId: string,
-		status: "success" | "failed",
-		errorMessage?: string,
-	) {
-		const execution = await WorkflowExecution.findByPk(executionId);
+	async completeExecution(executionId: string, status: 'success' | 'failed', errorMessage?: string) {
+		const execution = await WorkflowExecution.findByPk(executionId)
 		if (!execution) {
-			throw new Error("Execution not found");
+			throw new Error('Execution not found')
 		}
 
-		const endTime = new Date();
-		const duration = `${Math.floor((endTime.getTime() - execution.startTime.getTime()) / 1000)}s`;
+		const endTime = new Date()
+		const duration = `${Math.floor((endTime.getTime() - execution.startTime.getTime()) / 1000)}s`
 
 		await execution.update({
 			status,
 			endTime,
 			duration,
-			errorMessage,
-		});
+			errorMessage
+		})
 
 		// Update workflow
 		await Workflow.update(
 			{
 				status,
-				duration,
+				duration
 			},
-			{ where: { id: execution.workflowId } },
-		);
+			{ where: { id: execution.workflowId } }
+		)
 
 		// Log completion
 		await ExecutionLog.create({
 			executionId: execution.id,
-			level: status === "success" ? "info" : "error",
+			level: status === 'success' ? 'info' : 'error',
 			message:
-				status === "success"
+				status === 'success'
 					? `Workflow execution completed successfully in ${duration}`
-					: `Workflow execution failed: ${errorMessage || "Unknown error"}`,
-			timestamp: endTime,
-		});
+					: `Workflow execution failed: ${errorMessage || 'Unknown error'}`,
+			timestamp: endTime
+		})
 
-		return execution;
+		return execution
 	},
 
 	async getWorkflowStats(workflowId: string) {
 		const executions = await WorkflowExecution.findAll({
 			where: { workflowId },
-			order: [["createdAt", "DESC"]],
-		});
+			order: [['createdAt', 'DESC']]
+		})
 
-		const thisWeek = new Date();
-		thisWeek.setDate(thisWeek.getDate() - 7);
+		const thisWeek = new Date()
+		thisWeek.setDate(thisWeek.getDate() - 7)
 
-		const executionsThisWeek = executions.filter(
-			(e) => e.createdAt >= thisWeek,
-		);
-		const successfulExecutions = executions.filter(
-			(e) => e.status === "success",
-		);
-		const failedExecutions = executions.filter((e) => e.status === "failed");
+		const executionsThisWeek = executions.filter((e) => e.createdAt >= thisWeek)
+		const successfulExecutions = executions.filter((e) => e.status === 'success')
+		const failedExecutions = executions.filter((e) => e.status === 'failed')
 
 		// Calculate average duration
-		const completedExecutions = executions.filter((e) => e.duration);
+		const completedExecutions = executions.filter((e) => e.duration)
 		const avgDurationMs =
 			completedExecutions.length > 0
 				? completedExecutions.reduce((acc, e) => {
-						const seconds = e.duration
-							? Number.parseInt(e.duration.replace("s", ""), 10)
-							: 0;
-						return acc + seconds;
+						const seconds = e.duration ? Number.parseInt(e.duration.replace('s', ''), 10) : 0
+						return acc + seconds
 					}, 0) / completedExecutions.length
-				: 0;
+				: 0
 
 		return {
 			totalExecutions: executions.length,
 			executionsThisWeek: executionsThisWeek.length,
-			successRate:
-				executions.length > 0
-					? Math.round((successfulExecutions.length / executions.length) * 100)
-					: 0,
+			successRate: executions.length > 0 ? Math.round((successfulExecutions.length / executions.length) * 100) : 0,
 			successCount: successfulExecutions.length,
 			failureCount: failedExecutions.length,
-			failureRate:
-				executions.length > 0
-					? Math.round((failedExecutions.length / executions.length) * 100)
-					: 0,
-			avgDuration: `${Math.round(avgDurationMs)}s`,
-		};
-	},
-};
+			failureRate: executions.length > 0 ? Math.round((failedExecutions.length / executions.length) * 100) : 0,
+			avgDuration: `${Math.round(avgDurationMs)}s`
+		}
+	}
+}
+
+export * as WorkflowHistoryService from './WorkflowHistoryService'

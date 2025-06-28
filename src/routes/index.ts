@@ -3,6 +3,7 @@ import { setupAuthRoutes } from './auth'
 import { setupWorkspaceRoutes } from './workspaces'
 import { setupProjectRoutes } from './projects'
 import { setupWorkflowRoutes } from './workflows'
+import { setupWorkflowHistoryRoutes } from './workflowHistory'
 import { setupSettingsRoutes } from './settings'
 import { setupAdminRoutes } from './admin'
 import { verifyPermission } from '../middleware/permissions'
@@ -13,6 +14,7 @@ const router: Record<string, any> = {
 	...setupWorkspaceRoutes,
 	...setupProjectRoutes,
 	...setupWorkflowRoutes,
+	...setupWorkflowHistoryRoutes,
 	...setupSettingsRoutes,
 	...setupAdminRoutes
 }
