@@ -43,6 +43,8 @@ export const setupSocketRoutes = (io: Server) => {
 
 			if (!verifyPermission(socket as Required<AuthenticatedSocket>, event, ommitedPermissions)) {
 				next(new Error(`No cumple permisos para ejecutar el método ${event}`))
+				callback({ success: false, message: `No cumple permisos para ejecutar el método ${event}` })
+				return
 			}
 
 			if (!router[event]) {

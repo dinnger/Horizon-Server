@@ -71,10 +71,6 @@ WorkflowHistory.init(
 			type: DataTypes.TEXT,
 			allowNull: false
 		},
-		previousData: {
-			type: DataTypes.JSON,
-			allowNull: true
-		},
 		newData: {
 			type: DataTypes.JSON,
 			allowNull: true

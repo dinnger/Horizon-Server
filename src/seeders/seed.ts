@@ -166,7 +166,14 @@ export const seedDatabase = async () => {
 				description: 'Ejecutar workflows en sus proyectos',
 				status: 'active' as const
 			},
-
+			{
+				module: 'workflows',
+				action: 'get',
+				scope: 'project' as const,
+				priority: 30,
+				description: 'Obtener un workflow en sus proyectos',
+				status: 'active' as const
+			},
 			{
 				module: 'settings',
 				action: 'list',
@@ -540,97 +547,97 @@ export const seedDatabase = async () => {
 			}
 		})
 
-		// Create sample projects
-		const webAppProject = await Project.findOrCreate({
-			where: {
-				workspaceId: userWorkspace[0].id,
-				name: 'Web Application'
-			},
-			defaults: {
-				name: 'Web Application',
-				description: 'Una aplicación web moderna con Vue.js y TypeScript',
-				workspaceId: userWorkspace[0].id,
-				status: 'active'
-			}
-		})
+		// // Create sample projects
+		// const webAppProject = await Project.findOrCreate({
+		// 	where: {
+		// 		workspaceId: userWorkspace[0].id,
+		// 		name: 'Web Application'
+		// 	},
+		// 	defaults: {
+		// 		name: 'Web Application',
+		// 		description: 'Una aplicación web moderna con Vue.js y TypeScript',
+		// 		workspaceId: userWorkspace[0].id,
+		// 		status: 'active'
+		// 	}
+		// })
 
-		const mobileAppProject = await Project.findOrCreate({
-			where: {
-				workspaceId: userWorkspace[0].id,
-				name: 'Mobile App'
-			},
-			defaults: {
-				name: 'Mobile App',
-				description: 'Aplicación móvil para iOS y Android',
-				workspaceId: userWorkspace[0].id,
-				status: 'inactive'
-			}
-		})
+		// const mobileAppProject = await Project.findOrCreate({
+		// 	where: {
+		// 		workspaceId: userWorkspace[0].id,
+		// 		name: 'Mobile App'
+		// 	},
+		// 	defaults: {
+		// 		name: 'Mobile App',
+		// 		description: 'Aplicación móvil para iOS y Android',
+		// 		workspaceId: userWorkspace[0].id,
+		// 		status: 'inactive'
+		// 	}
+		// })
 
-		const apiProject = await Project.findOrCreate({
-			where: {
-				workspaceId: userWorkspace[0].id,
-				name: 'API Backend'
-			},
-			defaults: {
-				name: 'API Backend',
-				description: 'API REST con Node.js y Express',
-				workspaceId: userWorkspace[0].id,
-				status: 'active'
-			}
-		})
+		// const apiProject = await Project.findOrCreate({
+		// 	where: {
+		// 		workspaceId: userWorkspace[0].id,
+		// 		name: 'API Backend'
+		// 	},
+		// 	defaults: {
+		// 		name: 'API Backend',
+		// 		description: 'API REST con Node.js y Express',
+		// 		workspaceId: userWorkspace[0].id,
+		// 		status: 'active'
+		// 	}
+		// })
 
-		// Create sample workflows
-		const sampleWorkflows = [
-			{
-				name: 'Procesamiento de Datos',
-				description: 'Workflow para procesamiento automático de datos',
-				projectId: webAppProject[0].id,
-				status: 'success' as const,
-				lastRun: new Date('2024-12-25T10:30:00Z'),
-				duration: '2m 15s',
-				version: '1.0.0',
-				isPublished: true
-			},
-			{
-				name: 'Validación de Usuario',
-				description: 'Workflow para validar y autenticar usuarios',
-				projectId: webAppProject[0].id,
-				status: 'running' as const,
-				lastRun: new Date('2024-12-25T11:45:00Z'),
-				duration: '45s',
-				version: '0.8.3',
-				isPublished: false
-			},
-			{
-				name: 'Generación de Reportes',
-				description: 'Workflow automático para generar reportes diarios',
-				projectId: apiProject[0].id,
-				status: 'failed' as const,
-				lastRun: new Date('2024-12-25T09:15:00Z'),
-				duration: '1m 30s',
-				version: '1.2.1',
-				isPublished: true
-			},
-			{
-				name: 'Backup de Datos',
-				description: 'Workflow para backup automático de la base de datos',
-				projectId: apiProject[0].id,
-				status: 'pending' as const,
-				version: '0.5.0',
-				isPublished: false
-			}
-		]
+		// // Create sample workflows
+		// const sampleWorkflows = [
+		// 	{
+		// 		name: 'Procesamiento de Datos',
+		// 		description: 'Workflow para procesamiento automático de datos',
+		// 		projectId: webAppProject[0].id,
+		// 		status: 'success' as const,
+		// 		lastRun: new Date('2024-12-25T10:30:00Z'),
+		// 		duration: '2m 15s',
+		// 		version: '1.0.0',
+		// 		isPublished: true
+		// 	},
+		// 	{
+		// 		name: 'Validación de Usuario',
+		// 		description: 'Workflow para validar y autenticar usuarios',
+		// 		projectId: webAppProject[0].id,
+		// 		status: 'running' as const,
+		// 		lastRun: new Date('2024-12-25T11:45:00Z'),
+		// 		duration: '45s',
+		// 		version: '0.8.3',
+		// 		isPublished: false
+		// 	},
+		// 	{
+		// 		name: 'Generación de Reportes',
+		// 		description: 'Workflow automático para generar reportes diarios',
+		// 		projectId: apiProject[0].id,
+		// 		status: 'failed' as const,
+		// 		lastRun: new Date('2024-12-25T09:15:00Z'),
+		// 		duration: '1m 30s',
+		// 		version: '1.2.1',
+		// 		isPublished: true
+		// 	},
+		// 	{
+		// 		name: 'Backup de Datos',
+		// 		description: 'Workflow para backup automático de la base de datos',
+		// 		projectId: apiProject[0].id,
+		// 		status: 'pending' as const,
+		// 		version: '0.5.0',
+		// 		isPublished: false
+		// 	}
+		// ]
 
-		for (const workflowData of sampleWorkflows) {
-			await Workflow.findOrCreate({
-				where: {
-					projectId: workflowData.projectId,
-					name: workflowData.name
-				},
-				defaults: workflowData
-			})
-		}
+		// for (const workflowData of sampleWorkflows) {
+		// 	await Workflow.findOrCreate({
+		// 		where: {
+		// 			projectId: workflowData.projectId,
+		// 			name: workflowData.name
+		// 		},
+		// 		defaults: workflowData
+		// 	})
+		// }
 
 		console.log('Database seeded successfully!')
 	} catch (error) {

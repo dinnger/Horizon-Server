@@ -25,6 +25,32 @@ export const setupWorkflowRoutes = {
 		}
 	},
 
+	// Get workflow by ID - requires read permission
+	'workflows:get': async ({ socket, data, callback }: SocketData) => {
+		try {
+			const { id } = data
+
+			const workflow = await Workflow.findOne({
+				where: {
+					id,
+					status: {
+						[Op.ne]: 'archived'
+					}
+				}
+			})
+
+			if (!workflow) {
+				callback({ success: false, message: 'Workflow no encontrado' })
+				return
+			}
+
+			callback({ success: true, workflow })
+		} catch (error) {
+			console.error('Error obteniendo workflow:', error)
+			callback({ success: false, message: 'Error al obtener workflow' })
+		}
+	},
+
 	// Create workflow - requires authentication and project access
 	// Create workflow - requires create permission
 	'workflows:create': async ({ socket, data, callback }: SocketData) => {
