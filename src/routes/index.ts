@@ -6,6 +6,7 @@ import { setupWorkflowRoutes } from './workflows'
 import { setupWorkflowHistoryRoutes } from './workflowHistory'
 import { setupSettingsRoutes } from './settings'
 import { setupAdminRoutes } from './admin'
+import { setupNodeRoutes } from './nodes'
 import { verifyPermission } from '../middleware/permissions'
 import type { AuthenticatedSocket } from '../middleware/socketAuth'
 
@@ -16,7 +17,8 @@ const router: Record<string, any> = {
 	...setupWorkflowRoutes,
 	...setupWorkflowHistoryRoutes,
 	...setupSettingsRoutes,
-	...setupAdminRoutes
+	...setupAdminRoutes,
+	...setupNodeRoutes
 }
 
 export interface SocketData {

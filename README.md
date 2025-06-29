@@ -23,6 +23,7 @@ Las rutas están organizadas en módulos separados:
 - **`workflows.ts`**: Gestión de workflows con validación de acceso al proyecto
 - **`settings.ts`**: Configuraciones de usuario
 - **`admin.ts`**: Administración de roles, permisos y usuarios (solo admins)
+- **`nodes.ts`**: Gestión de nodos de workflows (listar, buscar, obtener información)
 
 ### Validación de Permisos
 
@@ -222,4 +223,32 @@ socket.emit(
     }
   }
 );
+
+// Listar todos los nodos disponibles
+socket.emit("nodes:list", {}, (response) => {
+  if (response.success) {
+    console.log("Nodos disponibles:", response.nodes);
+  }
+});
+
+// Buscar nodos por término
+socket.emit("nodes:search", { query: "http" }, (response) => {
+  if (response.success) {
+    console.log("Nodos encontrados:", response.nodes);
+  }
+});
+
+// Obtener grupos de nodos
+socket.emit("nodes:groups", {}, (response) => {
+  if (response.success) {
+    console.log("Grupos de nodos:", response.groups);
+  }
+});
+
+// Obtener información específica de un nodo
+socket.emit("nodes:info", { type: "http/request" }, (response) => {
+  if (response.success) {
+    console.log("Información del nodo:", response.node);
+  }
+});
 ```

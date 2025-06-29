@@ -5,6 +5,11 @@ export function verifyPermission(socket: Required<AuthenticatedSocket>, event: s
 		return true
 	}
 
+	if (!socket.user.role) {
+		console.error(`No se encontró el usuario ${socket.userId}`)
+		return false
+	}
+
 	const permissions = (socket.user.role?.permissions || []).map((permission) => `${permission.module}:${permission.action}`)
 	if (permissions.includes(event)) {
 		return true
