@@ -1,60 +1,63 @@
-import express from "express";
-import { createServer } from "node:http";
-import { Server } from "socket.io";
-import cors from "cors";
-import { config } from "dotenv";
-import { initDatabase } from "./models";
-import { seedDatabase } from "./seeders/seed";
-import { socketAuthMiddleware } from "./middleware/socketAuth";
-import { setupSocketRoutes } from "./routes";
+// Initialize module aliases
+import 'module-alias/register'
+
+import express from 'express'
+import { createServer } from 'node:http'
+import { Server } from 'socket.io'
+import cors from 'cors'
+import { config } from 'dotenv'
+import { initDatabase } from './models'
+import { seedDatabase } from './seeders/seed'
+import { socketAuthMiddleware } from './middleware/socketAuth'
+import { setupSocketRoutes } from './routes'
 
 // Load environment variables
-config();
+config()
 
-const app = express();
-const server = createServer(app);
+const app = express()
+const server = createServer(app)
 const io = new Server(server, {
 	cors: {
-		origin: process.env.CLIENT_URL || "http://localhost:5173",
-		methods: ["GET", "POST"],
-	},
-});
+		origin: process.env.CLIENT_URL || 'http://localhost:5173',
+		methods: ['GET', 'POST']
+	}
+})
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3001
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors())
+app.use(express.json())
 
 // Socket.IO authentication middleware
-io.use(socketAuthMiddleware);
+io.use(socketAuthMiddleware)
 
 // Setup all socket routes
-setupSocketRoutes(io);
+setupSocketRoutes(io)
 
 // Health check endpoint
-app.get("/health", (req, res) => {
-	res.json({ status: "OK", timestamp: new Date().toISOString() });
-});
+app.get('/health', (req, res) => {
+	res.json({ status: 'OK', timestamp: new Date().toISOString() })
+})
 
 // Initialize database and start server
 const startServer = async () => {
 	try {
-		await initDatabase();
+		await initDatabase()
 
 		// Seed database if needed
-		if (process.env.SEED_DATABASE === "true") {
-			await seedDatabase();
+		if (process.env.SEED_DATABASE === 'true') {
+			await seedDatabase()
 		}
 
 		server.listen(PORT, () => {
-			console.log(`Servidor corriendo en puerto ${PORT}`);
-			console.log("Socket.IO listo para conexiones");
-		});
+			console.log(`Servidor corriendo en puerto ${PORT}`)
+			console.log('Socket.IO listo para conexiones')
+		})
 	} catch (error) {
-		console.error("Error iniciando servidor:", error);
-		process.exit(1);
+		console.error('Error iniciando servidor:', error)
+		process.exit(1)
 	}
-};
+}
 
-startServer();
+startServer()

@@ -123,15 +123,7 @@ export const setupWorkflowHistoryRoutes = {
 				return
 			}
 
-			const result = await WorkflowHistoryService.recordUpdate(
-				workflowId,
-				userId,
-				previousData,
-				newData,
-				version,
-				changeDescription,
-				metadata
-			)
+			const result = await WorkflowHistoryService.recordUpdate(workflowId, userId, previousData, newData, version, changeDescription)
 
 			callback({ success: true, data: result })
 		} catch (error) {

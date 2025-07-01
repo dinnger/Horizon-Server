@@ -85,7 +85,7 @@ export const setupNodeRoutes = {
 			if (group) {
 				filteredNodes = Object.fromEntries(
 					Object.entries(nodeClasses).filter(([key, node]) => {
-						const nodeGroup = Array.isArray(node.group) ? node.group.join('/') : node.group
+						const nodeGroup = Array.isArray(node.group) ? node.group.join('/') : node.group || ''
 						return nodeGroup === group || nodeGroup.startsWith(`${group}/`)
 					})
 				)
@@ -141,7 +141,7 @@ export const setupNodeRoutes = {
 				Object.entries(nodeClasses).filter(([key, node]) => {
 					return (
 						node.name.toLowerCase().includes(searchTerm) ||
-						node.info.description?.toLowerCase().includes(searchTerm) ||
+						node.info.desc?.toLowerCase().includes(searchTerm) ||
 						node.type.toLowerCase().includes(searchTerm) ||
 						(Array.isArray(node.group) ? node.group.join('/') : node.group || '').toLowerCase().includes(searchTerm)
 					)
