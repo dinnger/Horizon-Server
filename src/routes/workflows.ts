@@ -1,5 +1,5 @@
 import { Op } from 'sequelize'
-import { Workflow, Project, Workspace, WorkflowExecution } from '../models'
+import { Workflow, WorkflowExecution, WorkflowHistory } from '../models'
 import type { SocketData } from './index'
 import { getNodeClass } from '@shared/store/node.store'
 import * as fs from 'node:fs'
@@ -101,6 +101,27 @@ export const setupWorkflowRoutes = {
 				updatedAt: new Date()
 			}
 
+			// Validar si existen cambios en el workflow
+			const originalWorkflow = await Workflow.findByPk(id)
+			if (!originalWorkflow?.workflowData) {
+				callback({ success: false, message: 'Workflow no encontrado' })
+				return
+			}
+
+			// Verificar si los nodos y conexiones han cambiado
+			const originalNodes = originalWorkflow.workflowData.nodes
+			const originalConnections = originalWorkflow.workflowData.connections
+			const newNodes = nodes
+			const newConnections = connections
+
+			if (
+				JSON.stringify(originalNodes) === JSON.stringify(newNodes) &&
+				JSON.stringify(originalConnections) === JSON.stringify(newConnections)
+			) {
+				callback({ success: false, message: 'No se han realizado cambios en el workflow' })
+				return
+			}
+
 			const [updatedRows] = await Workflow.update(updates, { where: { id }, individualHooks: true })
 			if (updatedRows > 0) {
 				const updatedWorkflow = await Workflow.findByPk(id)
@@ -133,16 +154,41 @@ export const setupWorkflowRoutes = {
 	// Execute workflow - requires execute permission
 	'workflows:execute': async ({ socket, data, callback }: SocketData) => {
 		try {
-			const { workflowId, trigger = 'manual' } = data
+			const { workflowId, trigger = 'manual', version } = data
 
-			// Get workflow data to save to file
-			const workflow = await Workflow.findByPk(workflowId)
-			if (!workflow) {
-				callback({ success: false, message: 'Workflow no encontrado' })
-				return
+			let workflowData: any
+			let workflowVersion: string
+
+			if (version) {
+				// Si se especifica una versión, buscar en el historial
+				const historyEntry = await WorkflowHistory.findOne({
+					where: {
+						workflowId,
+						version
+					},
+					order: [['createdAt', 'DESC']] // En caso de múltiples entradas con la misma versión
+				})
+
+				if (!historyEntry) {
+					callback({ success: false, message: `Versión ${version} no encontrada para el workflow` })
+					return
+				}
+
+				workflowData = historyEntry.newData
+				workflowVersion = historyEntry.version
+			} else {
+				// Si no se especifica versión, usar la versión actual (última)
+				const workflow = await Workflow.findByPk(workflowId)
+				if (!workflow) {
+					callback({ success: false, message: 'Workflow no encontrado' })
+					return
+				}
+
+				workflowData = workflow.workflowData
+				workflowVersion = workflow.version
 			}
 
-			// Save workflow to file before execution
+			// Save workflow to file before execution with version info
 			try {
 				const dataDir = path.join(process.cwd(), 'data', workflowId)
 
@@ -151,11 +197,18 @@ export const setupWorkflowRoutes = {
 					fs.mkdirSync(dataDir, { recursive: true })
 				}
 
-				// Save flow.json
-				const flowPath = path.join(dataDir, 'flow.json')
-				fs.writeFileSync(flowPath, JSON.stringify(workflow.workflowData, null, 2), 'utf8')
+				// Save flow.json with version info
+				const flowData = {
+					version: workflowVersion,
+					executedAt: new Date().toISOString(),
+					...workflowData
+				}
 
-				console.log(`Flujo guardado en: ${flowPath}`)
+				// Also save as latest flow.json
+				const latestFlowPath = path.join(dataDir, 'flow.json')
+				fs.writeFileSync(latestFlowPath, JSON.stringify(flowData, null, 2), 'utf8')
+
+				console.log(`Flujo v${workflowVersion} guardado en: ${latestFlowPath}`)
 			} catch (fileError) {
 				console.error('Error guardando flujo en archivo:', fileError)
 				// Continue with execution even if file save fails
@@ -166,17 +219,20 @@ export const setupWorkflowRoutes = {
 				workflowId,
 				status: 'running',
 				startTime: new Date(),
-				trigger
+				trigger,
+				version: workflowVersion // Store the executed version
 			})
 
-			// Update workflow status
-			await Workflow.update(
-				{
-					status: 'running',
-					lastRun: new Date()
-				},
-				{ where: { id: workflowId } }
-			)
+			// Update workflow status (only if executing latest version)
+			if (!version) {
+				await Workflow.update(
+					{
+						status: 'running',
+						lastRun: new Date()
+					},
+					{ where: { id: workflowId } }
+				)
+			}
 
 			// Simulate workflow execution (replace with actual execution logic)
 			setTimeout(async () => {
@@ -189,22 +245,31 @@ export const setupWorkflowRoutes = {
 					duration
 				})
 
-				await Workflow.update(
-					{
-						status: 'success',
-						duration
-					},
-					{ where: { id: workflowId } }
-				)
+				// Only update workflow status if executing latest version
+				if (!version) {
+					await Workflow.update(
+						{
+							status: 'success',
+							duration
+						},
+						{ where: { id: workflowId } }
+					)
+				}
 
 				socket.emit('workflows:execution-completed', {
 					workflowId,
 					executionId: execution.id,
-					status: 'success'
+					status: 'success',
+					version: workflowVersion
 				})
 			}, 3000)
 
-			callback({ success: true, executionId: execution.id })
+			callback({
+				success: true,
+				executionId: execution.id,
+				version: workflowVersion,
+				message: version ? `Ejecutando versión específica: ${workflowVersion}` : `Ejecutando última versión: ${workflowVersion}`
+			})
 		} catch (error) {
 			console.error('Error ejecutando workflow:', error)
 			callback({ success: false, message: 'Error al ejecutar workflow' })
@@ -276,6 +341,73 @@ export const setupWorkflowRoutes = {
 		} catch (error) {
 			console.error('Error guardando flujo en archivo:', error)
 			callback({ success: false, message: 'Error al guardar flujo en archivo' })
+		}
+	},
+
+	// Get workflow versions - requires read permission
+	'workflows:getVersions': async ({ socket, data, callback }: SocketData) => {
+		try {
+			const { workflowId } = data
+
+			// Get current workflow version
+			const workflow = await Workflow.findByPk(workflowId)
+			if (!workflow) {
+				callback({ success: false, message: 'Workflow no encontrado' })
+				return
+			}
+
+			// Get all versions from history
+			const { WorkflowHistory } = require('../models')
+			const historyVersions = await WorkflowHistory.findAll({
+				where: { workflowId },
+				attributes: ['version', 'changeType', 'changeDescription', 'createdAt'],
+				order: [['createdAt', 'DESC']]
+			})
+
+			// Combine current version with history
+			const versions = [
+				{
+					version: workflow.version,
+					changeType: 'current',
+					changeDescription: 'Versión actual',
+					createdAt: workflow.updatedAt,
+					isCurrent: true
+				},
+				...historyVersions.map((h: any) => ({
+					version: h.version,
+					changeType: h.changeType,
+					changeDescription: h.changeDescription,
+					createdAt: h.createdAt,
+					isCurrent: false
+				}))
+			]
+
+			// Remove duplicates and sort by version
+			const uniqueVersions = versions
+				.filter((v, i, arr) => arr.findIndex((a) => a.version === v.version) === i)
+				.sort((a, b) => {
+					// Sort by semantic version (major.minor.patch)
+					const aVersion = a.version.split('.').map(Number)
+					const bVersion = b.version.split('.').map(Number)
+
+					for (let i = 0; i < Math.max(aVersion.length, bVersion.length); i++) {
+						const aPart = aVersion[i] || 0
+						const bPart = bVersion[i] || 0
+						if (aPart !== bPart) {
+							return bPart - aPart // Descending order (latest first)
+						}
+					}
+					return 0
+				})
+
+			callback({
+				success: true,
+				versions: uniqueVersions,
+				currentVersion: workflow.version
+			})
+		} catch (error) {
+			console.error('Error obteniendo versiones:', error)
+			callback({ success: false, message: 'Error al obtener versiones del workflow' })
 		}
 	}
 }
