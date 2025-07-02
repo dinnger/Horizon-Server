@@ -17,7 +17,7 @@
  */
 
 import type { SocketData } from './index'
-import { getNodeClass } from '../../../shared/store/node.store'
+import { getNodeClass } from '@shared/store/node.store'
 // Mock data structure for nodes - esto debería ser reemplazado por la implementación real
 interface NodeInfo {
 	title: string
@@ -140,7 +140,7 @@ export const setupNodeRoutes = {
 			const filteredNodes = Object.fromEntries(
 				Object.entries(nodeClasses).filter(([key, node]) => {
 					return (
-						node.name.toLowerCase().includes(searchTerm) ||
+						node.info.name.toLowerCase().includes(searchTerm) ||
 						node.info.desc?.toLowerCase().includes(searchTerm) ||
 						node.type.toLowerCase().includes(searchTerm) ||
 						(Array.isArray(node.group) ? node.group.join('/') : node.group || '').toLowerCase().includes(searchTerm)
@@ -175,7 +175,7 @@ export const setupNodeRoutes = {
 
 			// Return only info without the class to avoid serialization issues
 			const nodeInfo = {
-				name: nodeClass.name,
+				name: nodeClass.info.name,
 				type: nodeClass.type,
 				info: nodeClass.info,
 				group: nodeClass.group,

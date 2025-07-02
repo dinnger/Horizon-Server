@@ -5,25 +5,24 @@ import express from 'express'
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'
 import cors from 'cors'
-import { config } from 'dotenv'
+
 import { initDatabase } from './models'
 import { seedDatabase } from './seeders/seed'
 import { socketAuthMiddleware } from './middleware/socketAuth'
 import { setupSocketRoutes } from './routes'
+import { envs } from './config/envs'
 
-// Load environment variables
-config()
 
 const app = express()
 const server = createServer(app)
 const io = new Server(server, {
 	cors: {
-		origin: process.env.CLIENT_URL || 'http://localhost:5173',
+		origin: envs.CLIENT_URL || 'http://localhost:5173',
 		methods: ['GET', 'POST']
 	}
 })
 
-const PORT = process.env.PORT || 3001
+const PORT = envs.PORT || 3001
 
 // Middleware
 app.use(cors())
@@ -46,7 +45,7 @@ const startServer = async () => {
 		await initDatabase()
 
 		// Seed database if needed
-		if (process.env.SEED_DATABASE === 'true') {
+		if (envs.SEED_DATABASE) {
 			await seedDatabase()
 		}
 

@@ -1,6 +1,9 @@
 import { Op } from 'sequelize'
 import { Workflow, Project, Workspace, WorkflowExecution } from '../models'
 import type { SocketData } from './index'
+import { getNodeClass } from '@shared/store/node.store'
+
+const nodeClass = getNodeClass()
 
 export const setupWorkflowRoutes = {
 	// List workflows - requires read permission
@@ -38,6 +41,24 @@ export const setupWorkflowRoutes = {
 					}
 				}
 			})
+
+			// Hidratación de propiedades
+			if (workflow?.workflowData?.nodes) {
+				for (const nodes of Object.values(workflow.workflowData.nodes)) {
+					// Si no existe el nodo, eliminarlo
+					if (!nodeClass[nodes.type]) {
+						delete workflow.workflowData.nodes[nodes.id]
+						continue
+					}
+					const property = nodeClass[nodes.type].properties
+					for (const [key, value] of Object.entries(nodes.properties)) {
+						nodes.properties[key] = {
+							...property[key],
+							...(value as object)
+						}
+					}
+				}
+			}
 
 			if (!workflow) {
 				callback({ success: false, message: 'Workflow no encontrado' })

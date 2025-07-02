@@ -9,6 +9,7 @@ import { setupAdminRoutes } from './admin'
 import { setupNodeRoutes } from './nodes'
 import { verifyPermission } from '../middleware/permissions'
 import type { AuthenticatedSocket } from '../middleware/socketAuth'
+import { envs } from '../config/envs'
 
 const router: Record<string, any> = {
 	...setupAuthRoutes,
@@ -50,9 +51,12 @@ export const setupSocketRoutes = (io: Server) => {
 			}
 
 			if (!router[event]) {
+				if (envs.TRACKING_ROUTE) console.log('[TRACKING_ROUTE]', 'No se encontró el método', event)
 				console.error(`No se encontró el método ${event}`)
 				next(new Error(`No se encontró el método ${event}`))
+				return
 			}
+			if (envs.TRACKING_ROUTE) console.log('[TRACKING_ROUTE]', event, typeof data === 'object' ? JSON.stringify(data) : data)
 			router[event]({ socket, data, callback })
 			next()
 		})

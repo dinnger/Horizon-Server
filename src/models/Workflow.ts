@@ -28,7 +28,10 @@ export class Workflow extends Model<WorkflowAttributes, WorkflowCreationAttribut
 	public status!: 'success' | 'running' | 'failed' | 'pending' | 'archived'
 	public lastRun?: Date
 	public duration?: string
-	public workflowData?: object
+	public workflowData?: {
+		nodes: Record<string, any>
+		connections: Record<string, any>
+	}
 	public version!: string
 	public isPublished!: boolean
 
