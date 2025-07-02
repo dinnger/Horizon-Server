@@ -2,6 +2,8 @@ import { Op } from 'sequelize'
 import { Workflow, Project, Workspace, WorkflowExecution } from '../models'
 import type { SocketData } from './index'
 import { getNodeClass } from '@shared/store/node.store'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 const nodeClass = getNodeClass()
 
@@ -133,6 +135,32 @@ export const setupWorkflowRoutes = {
 		try {
 			const { workflowId, trigger = 'manual' } = data
 
+			// Get workflow data to save to file
+			const workflow = await Workflow.findByPk(workflowId)
+			if (!workflow) {
+				callback({ success: false, message: 'Workflow no encontrado' })
+				return
+			}
+
+			// Save workflow to file before execution
+			try {
+				const dataDir = path.join(process.cwd(), 'data', workflowId)
+
+				// Create directory if it doesn't exist
+				if (!fs.existsSync(dataDir)) {
+					fs.mkdirSync(dataDir, { recursive: true })
+				}
+
+				// Save flow.json
+				const flowPath = path.join(dataDir, 'flow.json')
+				fs.writeFileSync(flowPath, JSON.stringify(workflow.workflowData, null, 2), 'utf8')
+
+				console.log(`Flujo guardado en: ${flowPath}`)
+			} catch (fileError) {
+				console.error('Error guardando flujo en archivo:', fileError)
+				// Continue with execution even if file save fails
+			}
+
 			// Create execution record
 			const execution = await WorkflowExecution.create({
 				workflowId,
@@ -180,6 +208,74 @@ export const setupWorkflowRoutes = {
 		} catch (error) {
 			console.error('Error ejecutando workflow:', error)
 			callback({ success: false, message: 'Error al ejecutar workflow' })
+		}
+	},
+
+	// Save workflow to JSON file - requires authentication and project access
+	'workflows:save-to-json': async ({ socket, data, callback }: SocketData) => {
+		try {
+			const { id } = data
+
+			const workflow = await Workflow.findOne({
+				where: {
+					id,
+					status: {
+						[Op.ne]: 'archived'
+					}
+				}
+			})
+
+			if (!workflow) {
+				callback({ success: false, message: 'Workflow no encontrado' })
+				return
+			}
+
+			// Define file path and name
+			const filePath = path.join(__dirname, `../../uploads/workflow_${id}.json`)
+
+			// Write workflow data to JSON file
+			fs.writeFileSync(filePath, JSON.stringify(workflow, null, 2))
+
+			callback({ success: true, filePath })
+		} catch (error) {
+			console.error('Error guardando workflow a JSON:', error)
+			callback({ success: false, message: 'Error al guardar workflow a JSON' })
+		}
+	},
+
+	// Save workflow to file - requires update permission
+	'workflows:saveToFile': async ({ socket, data, callback }: SocketData) => {
+		try {
+			const { workflowId } = data
+
+			// Get workflow data
+			const workflow = await Workflow.findByPk(workflowId)
+			if (!workflow) {
+				callback({ success: false, message: 'Workflow no encontrado' })
+				return
+			}
+
+			// Create data directory
+			const dataDir = path.join(process.cwd(), 'data', workflowId)
+
+			if (!fs.existsSync(dataDir)) {
+				fs.mkdirSync(dataDir, { recursive: true })
+			}
+
+			// Save flow.json
+			const flowPath = path.join(dataDir, 'flow.json')
+			fs.writeFileSync(flowPath, JSON.stringify(workflow.workflowData, null, 2), 'utf8')
+
+			console.log(`Flujo guardado en: ${flowPath}`)
+
+			callback({
+				success: true,
+				message: 'Flujo guardado exitosamente',
+				path: flowPath
+			})
+		} catch (error) {
+			console.error('Error guardando flujo en archivo:', error)
+			callback({ success: false, message: 'Error al guardar flujo en archivo' })
 		}
 	}
 }

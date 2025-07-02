@@ -29,4 +29,7 @@ coverage
 *.env
 *.sqlite
 
+# Generated workflow files
+data/
+
 *.tsbuildinfo
