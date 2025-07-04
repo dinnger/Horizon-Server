@@ -103,23 +103,25 @@ export const setupWorkflowRoutes = {
 
 			// Validar si existen cambios en el workflow
 			const originalWorkflow = await Workflow.findByPk(id)
-			if (!originalWorkflow?.workflowData) {
+			if (!originalWorkflow) {
 				callback({ success: false, message: 'Workflow no encontrado' })
 				return
 			}
 
-			// Verificar si los nodos y conexiones han cambiado
-			const originalNodes = originalWorkflow.workflowData.nodes
-			const originalConnections = originalWorkflow.workflowData.connections
-			const newNodes = nodes
-			const newConnections = connections
+			if (originalWorkflow.workflowData) {
+				// Verificar si los nodos y conexiones han cambiado
+				const originalNodes = originalWorkflow.workflowData.nodes
+				const originalConnections = originalWorkflow.workflowData.connections
+				const newNodes = nodes
+				const newConnections = connections
 
-			if (
-				JSON.stringify(originalNodes) === JSON.stringify(newNodes) &&
-				JSON.stringify(originalConnections) === JSON.stringify(newConnections)
-			) {
-				callback({ success: false, message: 'No se han realizado cambios en el workflow' })
-				return
+				if (
+					JSON.stringify(originalNodes) === JSON.stringify(newNodes) &&
+					JSON.stringify(originalConnections) === JSON.stringify(newConnections)
+				) {
+					callback({ success: false, message: 'No se han realizado cambios en el workflow' })
+					return
+				}
 			}
 
 			const [updatedRows] = await Workflow.update(updates, { where: { id }, individualHooks: true })

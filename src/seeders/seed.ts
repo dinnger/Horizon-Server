@@ -111,6 +111,14 @@ export const seedDatabase = async () => {
 			},
 			{
 				module: 'projects',
+				action: 'get',
+				scope: 'workspace' as const,
+				priority: 20,
+				description: 'Obtener un proyecto en sus workspaces',
+				status: 'active' as const
+			},
+			{
+				module: 'projects',
 				action: 'update',
 				scope: 'workspace' as const,
 				priority: 20,
