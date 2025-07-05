@@ -7,6 +7,7 @@ import { setupWorkflowHistoryRoutes } from './workflowHistory'
 import { setupSettingsRoutes } from './settings'
 import { setupAdminRoutes } from './admin'
 import { setupNodeRoutes } from './nodes'
+import { setupWorkerRoutes } from './workers'
 import { verifyPermission } from '../middleware/permissions'
 import type { AuthenticatedSocket } from '../middleware/socketAuth'
 import { envs } from '../config/envs'
@@ -19,7 +20,8 @@ const router: Record<string, any> = {
 	...setupWorkflowHistoryRoutes,
 	...setupSettingsRoutes,
 	...setupAdminRoutes,
-	...setupNodeRoutes
+	...setupNodeRoutes,
+	...setupWorkerRoutes
 }
 
 export interface SocketData {

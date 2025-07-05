@@ -249,6 +249,48 @@ export const seedDatabase = async () => {
 				status: 'active' as const
 			},
 
+			// Permisos para workers
+			{
+				module: 'workers',
+				action: 'list',
+				scope: 'global' as const,
+				priority: 50,
+				description: 'Ver todos los workers activos',
+				status: 'active' as const
+			},
+			{
+				module: 'workers',
+				action: 'dashboard',
+				scope: 'global' as const,
+				priority: 50,
+				description: 'Acceder al dashboard de workers',
+				status: 'active' as const
+			},
+			{
+				module: 'workers',
+				action: 'stop',
+				scope: 'global' as const,
+				priority: 80,
+				description: 'Detener workers',
+				status: 'active' as const
+			},
+			{
+				module: 'workers',
+				action: 'restart',
+				scope: 'global' as const,
+				priority: 80,
+				description: 'Reiniciar workers',
+				status: 'active' as const
+			},
+			{
+				module: 'workers',
+				action: 'message',
+				scope: 'global' as const,
+				priority: 70,
+				description: 'Enviar mensajes a workers',
+				status: 'active' as const
+			},
+
 			// Permisos administrativos (scope global)
 			{
 				module: 'users',
@@ -397,8 +439,8 @@ export const seedDatabase = async () => {
 		// Manager: Project and workflow management
 		const managerPermissions = permissions.filter(
 			(p) =>
-				['workspaces', 'projects', 'workflows', 'executions', 'dashboard', 'nodes'].includes(p.module) &&
-				['create', 'list', 'update', 'execute', 'get', 'search', 'groups', 'info', 'stats'].includes(p.action)
+				['workspaces', 'projects', 'workflows', 'executions', 'dashboard', 'nodes', 'workers'].includes(p.module) &&
+				['create', 'list', 'update', 'execute', 'get', 'search', 'groups', 'info', 'stats', 'dashboard', 'message'].includes(p.action)
 		)
 
 		for (const permission of managerPermissions) {
@@ -418,8 +460,8 @@ export const seedDatabase = async () => {
 		// User: Basic access
 		const userPermissions = permissions.filter(
 			(p) =>
-				['workspaces', 'projects', 'workflows', 'executions', 'dashboard', 'settings', 'nodes'].includes(p.module) &&
-				['list', 'execute', 'get', 'search', 'groups', 'info', 'stats'].includes(p.action)
+				['workspaces', 'projects', 'workflows', 'executions', 'dashboard', 'settings', 'nodes', 'workers'].includes(p.module) &&
+				['list', 'execute', 'get', 'search', 'groups', 'info', 'stats', 'dashboard'].includes(p.action)
 		)
 
 		for (const permission of userPermissions) {
@@ -438,7 +480,10 @@ export const seedDatabase = async () => {
 
 		// Viewer: Only read access
 		const viewerPermissions = permissions.filter(
-			(p) => p.action === 'list' || (p.module === 'nodes' && ['get', 'search', 'groups', 'info', 'stats'].includes(p.action))
+			(p) =>
+				p.action === 'list' ||
+				p.action === 'dashboard' ||
+				(p.module === 'nodes' && ['get', 'search', 'groups', 'info', 'stats'].includes(p.action))
 		)
 
 		for (const permission of viewerPermissions) {

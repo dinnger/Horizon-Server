@@ -2,6 +2,7 @@ import { Op } from 'sequelize'
 import { Workflow, WorkflowExecution, WorkflowHistory } from '../models'
 import type { SocketData } from './index'
 import { getNodeClass } from '@shared/store/node.store'
+import { workerManager } from '../services/workerManager'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -236,42 +237,131 @@ export const setupWorkflowRoutes = {
 				)
 			}
 
-			// Simulate workflow execution (replace with actual execution logic)
-			setTimeout(async () => {
-				const endTime = new Date()
-				const duration = `${Math.floor((endTime.getTime() - execution.startTime.getTime()) / 1000)}s`
-
-				await execution.update({
-					status: 'success',
-					endTime,
-					duration
-				})
-
-				// Only update workflow status if executing latest version
-				if (!version) {
-					await Workflow.update(
-						{
-							status: 'success',
-							duration
-						},
-						{ where: { id: workflowId } }
-					)
-				}
-
-				socket.emit('workflows:execution-completed', {
+			// Create and start worker for workflow execution
+			try {
+				const worker = await workerManager.createWorker({
 					workflowId,
-					executionId: execution.id,
-					status: 'success',
+					executionId: execution.id.toString(),
 					version: workflowVersion
 				})
-			}, 3000)
 
-			callback({
-				success: true,
-				executionId: execution.id,
-				version: workflowVersion,
-				message: version ? `Ejecutando versión específica: ${workflowVersion}` : `Ejecutando última versión: ${workflowVersion}`
-			})
+				console.log(`Worker ${worker.id} creado para ejecutar workflow ${workflowId}`)
+
+				// Set up worker event listeners for this execution
+				const handleWorkerReady = (workerInfo: any) => {
+					if (workerInfo.id === worker.id) {
+						console.log(`Worker ${worker.id} listo para ejecutar workflow ${workflowId}`)
+						socket.emit('workflows:worker-ready', {
+							workflowId,
+							executionId: execution.id,
+							workerId: worker.id,
+							port: worker.port
+						})
+						workerManager.off('worker:ready', handleWorkerReady)
+					}
+				}
+
+				const handleWorkerError = (errorData: any) => {
+					if (errorData.workerId === worker.id) {
+						console.error(`Error en worker ${worker.id}:`, errorData.error)
+
+						// Update execution status
+						execution.update({
+							status: 'failed',
+							endTime: new Date(),
+							errorMessage: errorData.error
+						})
+
+						// Update workflow status if executing latest version
+						if (!version) {
+							Workflow.update({ status: 'failed' }, { where: { id: workflowId } })
+						}
+
+						socket.emit('workflows:execution-error', {
+							workflowId,
+							executionId: execution.id,
+							workerId: worker.id,
+							error: errorData.error
+						})
+
+						workerManager.off('worker:error', handleWorkerError)
+					}
+				}
+
+				const handleWorkerExit = (exitData: any) => {
+					if (exitData.workerId === worker.id) {
+						const endTime = new Date()
+						const duration = `${Math.floor((endTime.getTime() - execution.startTime.getTime()) / 1000)}s`
+
+						// Determine final status based on exit code
+						const finalStatus = exitData.code === 0 ? 'success' : 'failed'
+
+						// Update execution record
+						execution.update({
+							status: finalStatus,
+							endTime,
+							duration
+						})
+
+						// Update workflow status if executing latest version
+						if (!version) {
+							Workflow.update(
+								{
+									status: finalStatus,
+									duration
+								},
+								{ where: { id: workflowId } }
+							)
+						}
+
+						socket.emit('workflows:execution-completed', {
+							workflowId,
+							executionId: execution.id,
+							status: finalStatus,
+							version: workflowVersion,
+							duration,
+							workerId: worker.id
+						})
+
+						workerManager.off('worker:exit', handleWorkerExit)
+					}
+				}
+
+				// Listen for worker events
+				workerManager.on('worker:ready', handleWorkerReady)
+				workerManager.on('worker:error', handleWorkerError)
+				workerManager.on('worker:exit', handleWorkerExit)
+
+				callback({
+					success: true,
+					executionId: execution.id,
+					workerId: worker.id,
+					port: worker.port,
+					version: workflowVersion,
+					message: version
+						? `Ejecutando versión específica: ${workflowVersion} en worker ${worker.id}`
+						: `Ejecutando última versión: ${workflowVersion} en worker ${worker.id}`
+				})
+			} catch (workerError) {
+				console.error('Error creando worker:', workerError)
+
+				// Update execution status
+				await execution.update({
+					status: 'failed',
+					endTime: new Date(),
+					errorMessage: workerError instanceof Error ? workerError.message : 'Error creating worker'
+				})
+
+				// Update workflow status if executing latest version
+				if (!version) {
+					await Workflow.update({ status: 'failed' }, { where: { id: workflowId } })
+				}
+
+				callback({
+					success: false,
+					message: `Error creando worker: ${workerError instanceof Error ? workerError.message : 'Unknown error'}`
+				})
+			}
 		} catch (error) {
 			console.error('Error ejecutando workflow:', error)
 			callback({ success: false, message: 'Error al ejecutar workflow' })
